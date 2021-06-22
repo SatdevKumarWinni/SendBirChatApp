@@ -100,10 +100,10 @@ public class GroupChatFragment extends Fragment {
     private ImageButton mUploadFileButton;
     private View mCurrentEventLayout;
     private TextView mCurrentEventText;
+    private String chatUserId;
 
     private GroupChannel mChannel;
     private String mChannelUrl;
-    private String chatUserId;
     private PreviousMessageListQuery mPrevMessageListQuery;
 
     private boolean mIsTyping;
@@ -138,6 +138,7 @@ public class GroupChatFragment extends Fragment {
             // Get channel URL from GroupChannelListFragment.
             mChannelUrl = getArguments().getString(MainActivity.EXTRA_GROUP_CHANNEL_URL);
             chatUserId = getArguments().getString(MainActivity.CHAT_USER_ID);
+
         }
 
         Log.d(LOG_TAG, mChannelUrl);
@@ -148,6 +149,7 @@ public class GroupChatFragment extends Fragment {
         // Load messages from cache.
         mChatAdapter.load(mChannelUrl);
     }
+
 
     @Nullable
     @Override
@@ -259,11 +261,11 @@ public class GroupChatFragment extends Fragment {
                     mChatAdapter.setChannel(mChannel);
                     mChatAdapter.loadLatestMessages(CHANNEL_LIST_LIMIT,
                             new BaseChannel.GetMessagesHandler() {
-                        @Override
-                        public void onResult(List<BaseMessage> list, SendBirdException e) {
-                            mChatAdapter.markAllMessagesAsRead();
-                        }
-                    });
+                                @Override
+                                public void onResult(List<BaseMessage> list, SendBirdException e) {
+                                    mChatAdapter.markAllMessagesAsRead();
+                                }
+                            });
                     updateActionBarTitle();
                 }
             });
@@ -279,11 +281,11 @@ public class GroupChatFragment extends Fragment {
 
                     mChatAdapter.loadLatestMessages(CHANNEL_LIST_LIMIT,
                             new BaseChannel.GetMessagesHandler() {
-                        @Override
-                        public void onResult(List<BaseMessage> list, SendBirdException e) {
-                            mChatAdapter.markAllMessagesAsRead();
-                        }
-                    });
+                                @Override
+                                public void onResult(List<BaseMessage> list, SendBirdException e) {
+                                    mChatAdapter.markAllMessagesAsRead();
+                                }
+                            });
                     updateActionBarTitle();
                 }
             });
@@ -306,53 +308,53 @@ public class GroupChatFragment extends Fragment {
 
         SendBird.addChannelHandler(CHANNEL_HANDLER_ID,
                 new SendBird.ChannelHandler() {
-            @Override
-            public void onMessageReceived(BaseChannel baseChannel, BaseMessage baseMessage) {
-                if (baseChannel.getUrl().equals(mChannelUrl)) {
-                    mChatAdapter.markAllMessagesAsRead();
-                    // Add new message to view
-                    mChatAdapter.addFirst(baseMessage);
-                }
-            }
+                    @Override
+                    public void onMessageReceived(BaseChannel baseChannel, BaseMessage baseMessage) {
+                        if (baseChannel.getUrl().equals(mChannelUrl)) {
+                            mChatAdapter.markAllMessagesAsRead();
+                            // Add new message to view
+                            mChatAdapter.addFirst(baseMessage);
+                        }
+                    }
 
-            @Override
-            public void onMessageDeleted(BaseChannel baseChannel, long msgId) {
-                super.onMessageDeleted(baseChannel, msgId);
-                if (baseChannel.getUrl().equals(mChannelUrl)) {
-                    mChatAdapter.delete(msgId);
-                }
-            }
+                    @Override
+                    public void onMessageDeleted(BaseChannel baseChannel, long msgId) {
+                        super.onMessageDeleted(baseChannel, msgId);
+                        if (baseChannel.getUrl().equals(mChannelUrl)) {
+                            mChatAdapter.delete(msgId);
+                        }
+                    }
 
-            @Override
-            public void onMessageUpdated(BaseChannel channel, BaseMessage message) {
-                super.onMessageUpdated(channel, message);
-                if (channel.getUrl().equals(mChannelUrl)) {
-                    mChatAdapter.update(message);
-                }
-            }
+                    @Override
+                    public void onMessageUpdated(BaseChannel channel, BaseMessage message) {
+                        super.onMessageUpdated(channel, message);
+                        if (channel.getUrl().equals(mChannelUrl)) {
+                            mChatAdapter.update(message);
+                        }
+                    }
 
-            @Override
-            public void onReadReceiptUpdated(GroupChannel channel) {
-                if (channel.getUrl().equals(mChannelUrl)) {
-                    mChatAdapter.notifyDataSetChanged();
-                }
-            }
+                    @Override
+                    public void onReadReceiptUpdated(GroupChannel channel) {
+                        if (channel.getUrl().equals(mChannelUrl)) {
+                            mChatAdapter.notifyDataSetChanged();
+                        }
+                    }
 
-            @Override
-            public void onTypingStatusUpdated(GroupChannel channel) {
-                if (channel.getUrl().equals(mChannelUrl)) {
-                    List<Member> typingUsers = channel.getTypingMembers();
-                    displayTyping(typingUsers);
-                }
-            }
+                    @Override
+                    public void onTypingStatusUpdated(GroupChannel channel) {
+                        if (channel.getUrl().equals(mChannelUrl)) {
+                            List<Member> typingUsers = channel.getTypingMembers();
+                            displayTyping(typingUsers);
+                        }
+                    }
 
-            @Override
-            public void onDeliveryReceiptUpdated(GroupChannel channel) {
-                if (channel.getUrl().equals(mChannelUrl)) {
-                    mChatAdapter.notifyDataSetChanged();
-                }
-            }
-        });
+                    @Override
+                    public void onDeliveryReceiptUpdated(GroupChannel channel) {
+                        if (channel.getUrl().equals(mChannelUrl)) {
+                            mChatAdapter.notifyDataSetChanged();
+                        }
+                    }
+                });
     }
 
     @Override
@@ -379,6 +381,31 @@ public class GroupChatFragment extends Fragment {
     }
 
     @Override
+    public void onCreateOptionsMenu(Menu menu, MenuInflater inflater) {
+        inflater.inflate(R.menu.menu_group_chat, menu);
+        super.onCreateOptionsMenu(menu, inflater);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+
+        /*if (id == R.id.action_group_channel_invite) {
+            Intent intent = new Intent(getActivity(), InviteMemberActivity.class);
+            intent.putExtra(EXTRA_CHANNEL_URL, mChannelUrl);
+            startActivity(intent);
+            return true;
+        } else if (id == R.id.action_group_channel_view_members) {
+            Intent intent = new Intent(getActivity(), MemberListActivity.class);
+            intent.putExtra(EXTRA_CHANNEL_URL, mChannelUrl);
+            startActivity(intent);
+            return true;
+        }*/
+
+        return super.onOptionsItemSelected(item);
+    }
+
+    @Override
     public void onActivityResult(int requestCode, int resultCode, final Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
@@ -392,66 +419,8 @@ public class GroupChatFragment extends Fragment {
                 return;
             }
 
-            if (data.getData().toString().contains("image")) {
-
-                        Uri selectedImageUri = data.getData();
-                try {
-                    Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContext().getContentResolver(), selectedImageUri);
-
-//                    Bitmap galleryImageBitmap= FileUtils.reduceBitmapSize( (Bitmap)new UserPicture(selectedImageUri, getContext().getContentResolver()).getBitmap(),1000000);
-                    Uri imageUri=getImageUri(getContext(),bitmap);
-                    sendFileWithThumbnail(imageUri);
-
-                } catch (IOException e) {
-                    Log.e(MainActivity.class.getSimpleName(), "Failed to load image", e);
-                };          //handle image
-
-            } else  if (data.getData().toString().contains("video")) {
-                //handle video
-                sendFileWithThumbnail(data.getData());
-            }
+            sendFileWithThumbnail(data.getData());
         }
-        else if (requestCode == INTENT_REQUEST_CAMERA && resultCode == Activity.RESULT_OK) {
-            // If user has successfully chosen the image, show a dialog to confirm upload.
-            try {
-                Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContext().getContentResolver(), cameraUri);
-                Log.e("fileSizeBeforeReduce", "onActivityResult: "+FileUtils.sizeOf(bitmap) );
-                Bitmap galleryImageBitmap= FileUtils.reduceBitmapSize(bitmap,100000);
-                Log.e("fileSizeAfterReduce", "onActivityResult: "+FileUtils.sizeOf(galleryImageBitmap) );
-
-                Uri imageUri=getImageUri(getContext(),galleryImageBitmap);
-                sendFileWithThumbnail(imageUri);
-
-            }catch (FileNotFoundException e)
-            {
-                e.printStackTrace();
-            }catch (Exception e){
-                e.printStackTrace();
-            }
-
-        }
-    }
-
-    public Uri getImageUri(Context inContext, Bitmap inImage) {
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        inImage.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
-        String path = MediaStore.Images.Media.insertImage(inContext.getContentResolver(), inImage, "Title", null);
-        return Uri.parse(path);
-    }
-
-    public static Bitmap reduceBitmapSize(Bitmap bitmap, int MAX_SIZE) {
-        double ratioSquare;
-        int bitmapHeight, bitmapWidth;
-        bitmapHeight = bitmap.getHeight();
-        bitmapWidth = bitmap.getWidth();
-        ratioSquare = (bitmapHeight * bitmapWidth) / MAX_SIZE;
-        if (ratioSquare <= 1)
-            return bitmap;
-        double ratio = Math.sqrt(ratioSquare);
-        Log.d("mylog", "Ratio: " + ratio);
-        int requiredHeight = (int) Math.round(bitmapHeight / ratio);
-        int requiredWidth = (int) Math.round(bitmapWidth / ratio);
-        return Bitmap.createScaledBitmap(bitmap, requiredWidth, requiredHeight, true);
     }
 
     private void setUpRecyclerView() {
@@ -549,47 +518,6 @@ public class GroupChatFragment extends Fragment {
         builder.create().show();
     }
 
-    Uri cameraUri;
-    private void openCameraOrGallery( )
-    {
-        String[] options = new String[] { "Camera", "Gallery" };
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
-        builder.setItems(options, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                if (which == 0) {
-
-                    ContentValues values = new ContentValues();
-                    values.put(MediaStore.Images.Media.TITLE, "New Picture");
-                    values.put(MediaStore.Images.Media.DESCRIPTION, "From the Camera");
-                    Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-                     cameraUri= getContext().getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
-
-                    cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
-                    startActivityForResult(cameraIntent, INTENT_REQUEST_CAMERA);
-
-                    SendBird.setAutoBackgroundDetection(false);
-
-                } else if (which == 1) {
-                    Intent intent = new Intent();
-
-                    intent.setType("image/* video/*");
-
-                    intent.setAction(Intent.ACTION_GET_CONTENT);
-
-                    // Always show the chooser (if there are multiple options available)
-                    startActivityForResult(Intent.createChooser(intent, "Select Media"), INTENT_REQUEST_CHOOSE_MEDIA);
-
-                    // Set this as false to maintain connection
-                    // even when an external Activity is started.
-                    SendBird.setAutoBackgroundDetection(false);
-                }
-            }
-        });
-        builder.create().show();
-    }
-
     private void setState(int state, BaseMessage editingMessage, final int position) {
         switch (state) {
             case STATE_NORMAL:
@@ -649,7 +577,6 @@ public class GroupChatFragment extends Fragment {
                 return false;
             }
         });
-
     }
 
     private void retryFailedMessage(final BaseMessage message) {
@@ -712,8 +639,53 @@ public class GroupChatFragment extends Fragment {
             // as per < API 23 guidelines.
             requestStoragePermissions();
         } else {
-           openCameraOrGallery();
-        }
+
+   }
+    }
+
+    Uri cameraUri;
+    private void openCameraOrGallery( )
+    {
+        String[] options = new String[] { "Camera", "Gallery" };
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
+        builder.setItems(options, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                if (which == 0) {
+
+                    ContentValues values = new ContentValues();
+                    values.put(MediaStore.Images.Media.TITLE, "New Picture");
+                    values.put(MediaStore.Images.Media.DESCRIPTION, "From the Camera");
+                    Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                    cameraUri= getContext().getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+
+                    cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
+                    startActivityForResult(Intent.createChooser(cameraIntent,"cameraImage"), INTENT_REQUEST_CAMERA);
+
+                    SendBird.setAutoBackgroundDetection(false);
+
+                } else if (which == 1) {
+
+                    Intent intent = new Intent();
+
+                    intent.setType("*/*");
+
+                    intent.setAction(Intent.ACTION_GET_CONTENT);
+
+                    // Always show the chooser (if there are multiple options available)
+                    startActivityForResult(Intent.createChooser(intent, "Select Media"), INTENT_REQUEST_CHOOSE_MEDIA);
+
+                    // Set this as false to maintain connection
+                    // even when an external Activity is started.
+                    SendBird.setAutoBackgroundDetection(false);
+                    // Set this as false to maintain connection
+                    // even when an external Activity is started.
+                    SendBird.setAutoBackgroundDetection(false);
+                }
+            }
+        });
+        builder.create().show();
     }
 
     private void requestStoragePermissions() {
@@ -902,57 +874,13 @@ public class GroupChatFragment extends Fragment {
      *
      * @param uri The URI of the image, which in this case is received through an Intent request.
      */
-    private void sendFile(Bitmap uri) {
-        if (mChannel == null) {
-            return;
-        }
-//      File image=  FileUtils.savePickUpPersonImage(getContext(),uri)
-
-
-        // Creating and adding a ThumbnailSize object (allowed number of thumbnail images: 3).
-        List<FileMessage.ThumbnailSize> thumbnailSizes = new ArrayList<>();
-        thumbnailSizes.add(new FileMessage.ThumbnailSize(100,100));
-        thumbnailSizes.add(new FileMessage.ThumbnailSize(200,200));
-        Log.e("dataSize", "sendFileWithThumbnail: "+thumbnailSizes.size() );
-
-
-
-            BaseChannel.SendFileMessageHandler fileMessageHandler = new BaseChannel.SendFileMessageHandler() {
-                @Override
-                public void onSent(FileMessage fileMessage, SendBirdException e) {
-                    if (e != null) {
-                        if (getActivity() != null) {
-                            Toast.makeText(getActivity(), "" + e.getCode() + ":" + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        }
-                        mChatAdapter.markMessageFailed(fileMessage);
-                        return;
-                    }
-
-                    mChatAdapter.markMessageSent(fileMessage);
-                }
-            };
-
-            // Send image with thumbnails in the specified dimensions
-//            FileMessage tempFileMessage = mChannel.sendFileMessage(params, fileMessageHandler);
-//
-//            mChatAdapter.addTempFileMessageInfo(tempFileMessage, uri);
-//            mChatAdapter.addFirst(tempFileMessage);
-        }
-
-
-    /**
-     * Sends a File Message containing an image file.
-     * Also requests thumbnails to be generated in specified sizes.
-     *
-     * @param uri The URI of the image, which in this case is received through an Intent request.
-     */
     private void sendFileWithThumbnail(Uri uri) {
         if (mChannel == null) {
             return;
         }
 
         // Specify two dimensions of thumbnails to generate
-        List<FileMessage.ThumbnailSize> thumbnailSizes = new ArrayList<FileMessage.ThumbnailSize>();
+        List<FileMessage.ThumbnailSize> thumbnailSizes = new ArrayList<>();
         thumbnailSizes.add(new FileMessage.ThumbnailSize(240, 240));
         thumbnailSizes.add(new FileMessage.ThumbnailSize(320, 320));
 
@@ -966,32 +894,30 @@ public class GroupChatFragment extends Fragment {
         final String name;
         if (info.containsKey("name")) {
             name = (String) info.get("name");
-        }
-        else {
+        } else {
             name = "Sendbird File";
         }
         final String path = (String) info.get("path");
         final File file = new File(path);
-        int file_size = Integer.parseInt(String.valueOf(file.length()/1024));
-        Log.e("MyFilesSize", "sendFileWithThumbnail: "+file_size );
-
         final String mime = (String) info.get("mime");
         final int size = (Integer) info.get("size");
 
         if (path == null || path.equals("")) {
             Toast.makeText(getActivity(), "File must be located in local storage.", Toast.LENGTH_LONG).show();
-        }
-        else {
-            BaseChannel.SendFileMessageHandler fileMessageHandler = (fileMessage, e) -> {
-                if (e != null) {
-                    if (getActivity() != null) {
-                        Toast.makeText(getActivity(), "" + e.getCode() + ":" + e.getMessage(), Toast.LENGTH_SHORT).show();
+        } else {
+            BaseChannel.SendFileMessageHandler fileMessageHandler = new BaseChannel.SendFileMessageHandler() {
+                @Override
+                public void onSent(FileMessage fileMessage, SendBirdException e) {
+                    if (e != null) {
+                        if (getActivity() != null) {
+                            Toast.makeText(getActivity(), "" + e.getCode() + ":" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                        }
+                        mChatAdapter.markMessageFailed(fileMessage);
+                        return;
                     }
-                    mChatAdapter.markMessageFailed(fileMessage);
-                    return;
-                }
 
-                mChatAdapter.markMessageSent(fileMessage);
+                    mChatAdapter.markMessageSent(fileMessage);
+                }
             };
 
             // Send image with thumbnails in the specified dimensions
