@@ -559,31 +559,41 @@ public class GroupChatFragment extends Fragment {
             @Override
             public void onClick(DialogInterface dialog, int which) {
                 if (which == 0) {
+                    if (ContextCompat.checkSelfPermission(getActivity(),
+                            Manifest.permission.CAMERA)
+                            != PackageManager.PERMISSION_GRANTED){
+                        requestStoragePermissions();
 
-                    ContentValues values = new ContentValues();
-                    values.put(MediaStore.Images.Media.TITLE, "New Picture");
-                    values.put(MediaStore.Images.Media.DESCRIPTION, "From the Camera");
-                    Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-                     cameraUri= getContext().getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+                    }else {
+                        ContentValues values = new ContentValues();
+                        values.put(MediaStore.Images.Media.TITLE, "New Picture");
+                        values.put(MediaStore.Images.Media.DESCRIPTION, "From the Camera");
+                        Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+                        cameraUri= getContext().getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
 
-                    cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
-                    startActivityForResult(cameraIntent, INTENT_REQUEST_CAMERA);
+                        cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
+                        startActivityForResult(cameraIntent, INTENT_REQUEST_CAMERA);
 
-                    SendBird.setAutoBackgroundDetection(false);
+                        SendBird.setAutoBackgroundDetection(false);
+                    }
 
                 } else if (which == 1) {
-                    Intent intent = new Intent();
+                    if (ContextCompat.checkSelfPermission(getActivity(),
+                            Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                            != PackageManager.PERMISSION_GRANTED){
+                        requestStoragePermissions();
+                    }else {
 
-                    intent.setType("image/* video/*");
+                        Intent intent = new Intent();
+                        intent.setType("image/* video/*");
+                        intent.setAction(Intent.ACTION_GET_CONTENT);
+                        // Always show the chooser (if there are multiple options available)
+                        startActivityForResult(Intent.createChooser(intent, "Select Media"), INTENT_REQUEST_CHOOSE_MEDIA);
 
-                    intent.setAction(Intent.ACTION_GET_CONTENT);
-
-                    // Always show the chooser (if there are multiple options available)
-                    startActivityForResult(Intent.createChooser(intent, "Select Media"), INTENT_REQUEST_CHOOSE_MEDIA);
-
-                    // Set this as false to maintain connection
-                    // even when an external Activity is started.
-                    SendBird.setAutoBackgroundDetection(false);
+                        // Set this as false to maintain connection
+                        // even when an external Activity is started.
+                        SendBird.setAutoBackgroundDetection(false);
+                    }
                 }
             }
         });
@@ -706,19 +716,26 @@ public class GroupChatFragment extends Fragment {
     }
 
     private void requestMedia() {
-        if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        if (ContextCompat.checkSelfPermission(getActivity(),
+                Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
             // If storage permissions are not granted, request permissions at run-time,
             // as per < API 23 guidelines.
             requestStoragePermissions();
-        } else {
-           openCameraOrGallery();
+        } else if (ContextCompat.checkSelfPermission(getActivity(),
+                Manifest.permission.CAMERA)
+                != PackageManager.PERMISSION_GRANTED){
+            requestStoragePermissions();
+        }
+        else{
+            openCameraOrGallery();
         }
     }
 
     private void requestStoragePermissions() {
-        if (ActivityCompat.shouldShowRequestPermissionRationale(getActivity(),
-                Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+        if (
+                ActivityCompat.shouldShowRequestPermissionRationale(getActivity(),
+                Manifest.permission.WRITE_EXTERNAL_STORAGE )) {
             // Provide an additional rationale to the user if the permission was not granted
             // and the user would benefit from additional context for the use of the permission.
             // For example if the user has previously denied the permission.
@@ -732,9 +749,23 @@ public class GroupChatFragment extends Fragment {
                         }
                     })
                     .show();
-        } else {
+        }else if (ActivityCompat.shouldShowRequestPermissionRationale
+                (getActivity(),Manifest.permission.CAMERA)){
+            Snackbar.make(mRootLayout, "Storage access permissions are required to upload/download files.",
+                    Snackbar.LENGTH_LONG)
+                    .setAction("Okay", new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            requestPermissions(new String[]{Manifest.permission.CAMERA},
+                                    PERMISSION_WRITE_EXTERNAL_STORAGE);
+                        }
+                    })
+                    .show();
+        }
+
+        else {
             // Permission has not been granted yet. Request it directly.
-            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE,Manifest.permission.CAMERA},
                     PERMISSION_WRITE_EXTERNAL_STORAGE);
         }
     }
@@ -973,6 +1004,7 @@ public class GroupChatFragment extends Fragment {
         final String path = (String) info.get("path");
         final File file = new File(path);
         int file_size = Integer.parseInt(String.valueOf(file.length()/1024));
+//        int fileInMb=fi
         Log.e("MyFilesSize", "sendFileWithThumbnail: "+file_size );
 
         final String mime = (String) info.get("mime");
@@ -982,6 +1014,7 @@ public class GroupChatFragment extends Fragment {
             Toast.makeText(getActivity(), "File must be located in local storage.", Toast.LENGTH_LONG).show();
         }
         else {
+            /*
             BaseChannel.SendFileMessageHandler fileMessageHandler = (fileMessage, e) -> {
                 if (e != null) {
                     if (getActivity() != null) {
@@ -995,11 +1028,49 @@ public class GroupChatFragment extends Fragment {
             };
 
             // Send image with thumbnails in the specified dimensions
-            FileMessage tempFileMessage = mChannel.sendFileMessage(file, name, mime, size, "", null, thumbnailSizes, fileMessageHandler);
+            FileMessage tempFileMessage = mChannel.sendFileMessage(file, name, mime, size, "", null, thumbnailSizes, fileMessageHandler);*/
+
+
+
+            FileMessageParams params = new FileMessageParams(file)
+                    .setFileName(file.getName())
+                    .setThumbnailSizes(thumbnailSizes)
+                    .setMimeType(mime)
+                    ;
+
+
+            FileMessage tempFileMessage = mChannel.sendFileMessage(params,
+                    new BaseChannel.SendFileMessageWithProgressHandler() {
+                        @Override
+                        public void onProgress(int bytesSent, int totalBytesSent, int totalBytesToSend) {
+                            int percent = (totalBytesSent * 100) / totalBytesToSend;
+                            Log.i("TAG", "Sending..." + percent);
+                        }
+
+                        @Override
+                        public void onSent(FileMessage message, SendBirdException e) {
+                            if (e != null) {
+                                if (getActivity() != null) {
+                                    Toast.makeText(getActivity(), "" + e.getCode() + ":" + e.getMessage(), Toast.LENGTH_SHORT).show();
+                                }
+                                mChatAdapter.markMessageFailed(message);
+                                return;
+                            }
+
+                            mChatAdapter.markMessageSent(message);
+                        }
+                    });
+
+
+
+
 
             mChatAdapter.addTempFileMessageInfo(tempFileMessage, uri);
             mChatAdapter.addFirst(tempFileMessage);
         }
+
+
+
     }
 
     private void editMessage(final BaseMessage message, String editedMessage) {
