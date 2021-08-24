@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "538978208045",
+    "project_id": "sendbirdtestingapp",
+    "storage_bucket": "sendbirdtestingapp.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:538978208045:android:ce20fcedbcf35174deeba4",
+        "android_client_info": {
+          "package_name": "infosys.satdev.sendbirchatapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "538978208045-drl08ohsr83n7soc80i2699chp5tndd9.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCcI6dPOcLW-oSS4QDtRy5grr0bOsxYWu8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "538978208045-drl08ohsr83n7soc80i2699chp5tndd9.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

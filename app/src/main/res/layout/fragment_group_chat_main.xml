@@ -19,7 +19,7 @@
 
         <ImageButton
             android:id="@+id/button_group_chat_upload"
-            app:srcCompat="@drawable/ic_add_black_24dp"
+            app:srcCompat="@drawable/ic_baseline_mic_24"
             android:background="?attr/selectableItemBackground"
             android:layout_width="48dp"
             android:layout_height="48dp"

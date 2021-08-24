@@ -1,23 +1,26 @@
 package infosys.satdev.sendbirchatapp.ui.imageUi;
 
-import android.Manifest;
+import static android.Manifest.permission.RECORD_AUDIO;
+import static android.Manifest.permission.WRITE_EXTERNAL_STORAGE;
+
 import android.app.Activity;
-import android.content.ContentValues;
+import android.app.Dialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.media.AudioAttributes;
+import android.media.MediaPlayer;
+import android.media.MediaRecorder;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.LayoutInflater;
-import android.view.Menu;
-import android.view.MenuInflater;
-import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.inputmethod.InputMethodManager;
@@ -42,13 +45,22 @@ import com.sendbird.android.AdminMessage;
 import com.sendbird.android.BaseChannel;
 import com.sendbird.android.BaseMessage;
 import com.sendbird.android.FileMessage;
-import com.sendbird.android.FileMessageParams;
 import com.sendbird.android.GroupChannel;
 import com.sendbird.android.Member;
 import com.sendbird.android.PreviousMessageListQuery;
 import com.sendbird.android.SendBird;
 import com.sendbird.android.SendBirdException;
 import com.sendbird.android.UserMessage;
+
+import org.json.JSONException;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Hashtable;
+import java.util.List;
+
 import infosys.satdev.sendbirchatapp.R;
 import infosys.satdev.sendbirchatapp.ui.MainActivity;
 import infosys.satdev.sendbirchatapp.utils.ConnectionManager;
@@ -57,40 +69,33 @@ import infosys.satdev.sendbirchatapp.utils.MediaPlayerActivity;
 import infosys.satdev.sendbirchatapp.utils.PhotoViewerActivity;
 import infosys.satdev.sendbirchatapp.utils.TextUtils;
 import infosys.satdev.sendbirchatapp.utils.UrlPreviewInfo;
-import infosys.satdev.sendbirchatapp.utils.UserPicture;
 import infosys.satdev.sendbirchatapp.utils.WebUtils;
-
-import org.json.JSONException;
-
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Hashtable;
-import java.util.List;
 
 
 public class GroupChatFragment extends Fragment {
 
+    // constant for storing audio permission
+    public static final int REQUEST_AUDIO_PERMISSION_CODE = 1;
+    static final String EXTRA_CHANNEL_URL = "EXTRA_CHANNEL_URL";
     private static final String LOG_TAG = GroupChatFragment.class.getSimpleName();
-
     private static final int CHANNEL_LIST_LIMIT = 30;
     private static final String CONNECTION_HANDLER_ID = "CONNECTION_HANDLER_GROUP_CHAT";
     private static final String CHANNEL_HANDLER_ID = "CHANNEL_HANDLER_GROUP_CHANNEL_CHAT";
-
     private static final int STATE_NORMAL = 0;
     private static final int STATE_EDIT = 1;
-
     private static final String STATE_CHANNEL_URL = "STATE_CHANNEL_URL";
     private static final int INTENT_REQUEST_CHOOSE_MEDIA = 301;
     private static final int INTENT_REQUEST_CAMERA = 123;
     private static final int PERMISSION_WRITE_EXTERNAL_STORAGE = 13;
-    static final String EXTRA_CHANNEL_URL = "EXTRA_CHANNEL_URL";
-
+    // string variable is created for storing a file name
+    private static String mFileName = null;
+    Uri cameraUri;
+    String fileName;
+    boolean alreadyPlay;
+    boolean isPLAYING;
+    MediaPlayer mp = new MediaPlayer();
+    MediaPlayer mediaPlayer = new MediaPlayer();
     private InputMethodManager mIMM;
-
     private RelativeLayout mRootLayout;
     private RecyclerView mRecyclerView;
     private GroupChatAdapter mChatAdapter;
@@ -100,21 +105,22 @@ public class GroupChatFragment extends Fragment {
     private ImageButton mUploadFileButton;
     private View mCurrentEventLayout;
     private TextView mCurrentEventText;
-
     private GroupChannel mChannel;
     private String mChannelUrl;
     private String chatUserId;
     private PreviousMessageListQuery mPrevMessageListQuery;
-
     private boolean mIsTyping;
-
     private int mCurrentState = STATE_NORMAL;
     private BaseMessage mEditingMessage = null;
+    // creating a variable for medi recorder object class.
+    private MediaRecorder mRecorder;
+    // creating a variable for mediaplayer class
+    private MediaPlayer mPlayer;
 
     /**
      * To create an instance of this fragment, a Channel URL should be required.
      */
-    public static GroupChatFragment newInstance(@NonNull String channelUrl,@NonNull String  ChatUserId) {
+    public static GroupChatFragment newInstance(@NonNull String channelUrl, @NonNull String ChatUserId) {
         GroupChatFragment fragment = new GroupChatFragment();
 
         Bundle args = new Bundle();
@@ -123,6 +129,21 @@ public class GroupChatFragment extends Fragment {
         fragment.setArguments(args);
 
         return fragment;
+    }
+
+    public static Bitmap reduceBitmapSize(Bitmap bitmap, int MAX_SIZE) {
+        double ratioSquare;
+        int bitmapHeight, bitmapWidth;
+        bitmapHeight = bitmap.getHeight();
+        bitmapWidth = bitmap.getWidth();
+        ratioSquare = (bitmapHeight * bitmapWidth) / MAX_SIZE;
+        if (ratioSquare <= 1)
+            return bitmap;
+        double ratio = Math.sqrt(ratioSquare);
+        Log.d("mylog", "Ratio: " + ratio);
+        int requiredHeight = (int) Math.round(bitmapHeight / ratio);
+        int requiredWidth = (int) Math.round(bitmapWidth / ratio);
+        return Bitmap.createScaledBitmap(bitmap, requiredWidth, requiredHeight, true);
     }
 
     @Override
@@ -157,15 +178,15 @@ public class GroupChatFragment extends Fragment {
 
         setRetainInstance(true);
 
-        mRootLayout = (RelativeLayout) rootView.findViewById(R.id.layout_group_chat_root);
-        mRecyclerView = (RecyclerView) rootView.findViewById(R.id.recycler_group_chat);
+        mRootLayout = rootView.findViewById(R.id.layout_group_chat_root);
+        mRecyclerView = rootView.findViewById(R.id.recycler_group_chat);
 
         mCurrentEventLayout = rootView.findViewById(R.id.layout_group_chat_current_event);
-        mCurrentEventText = (TextView) rootView.findViewById(R.id.text_group_chat_current_event);
+        mCurrentEventText = rootView.findViewById(R.id.text_group_chat_current_event);
 
-        mMessageEditText = (EditText) rootView.findViewById(R.id.edittext_group_chat_message);
-        mMessageSendButton = (Button) rootView.findViewById(R.id.button_group_chat_send);
-        mUploadFileButton = (ImageButton) rootView.findViewById(R.id.button_group_chat_upload);
+        mMessageEditText = rootView.findViewById(R.id.edittext_group_chat_message);
+        mMessageSendButton = rootView.findViewById(R.id.button_group_chat_send);
+        mUploadFileButton = rootView.findViewById(R.id.button_group_chat_upload);
 
         mMessageEditText.addTextChangedListener(new TextWatcher() {
             @Override
@@ -178,11 +199,7 @@ public class GroupChatFragment extends Fragment {
 
             @Override
             public void afterTextChanged(Editable s) {
-                if (s.length() > 0) {
-                    mMessageSendButton.setEnabled(true);
-                } else {
-                    mMessageSendButton.setEnabled(false);
-                }
+                mMessageSendButton.setEnabled(s.length() > 0);
             }
         });
 
@@ -259,11 +276,11 @@ public class GroupChatFragment extends Fragment {
                     mChatAdapter.setChannel(mChannel);
                     mChatAdapter.loadLatestMessages(CHANNEL_LIST_LIMIT,
                             new BaseChannel.GetMessagesHandler() {
-                        @Override
-                        public void onResult(List<BaseMessage> list, SendBirdException e) {
-                            mChatAdapter.markAllMessagesAsRead();
-                        }
-                    });
+                                @Override
+                                public void onResult(List<BaseMessage> list, SendBirdException e) {
+                                    mChatAdapter.markAllMessagesAsRead();
+                                }
+                            });
                     updateActionBarTitle();
                 }
             });
@@ -279,11 +296,11 @@ public class GroupChatFragment extends Fragment {
 
                     mChatAdapter.loadLatestMessages(CHANNEL_LIST_LIMIT,
                             new BaseChannel.GetMessagesHandler() {
-                        @Override
-                        public void onResult(List<BaseMessage> list, SendBirdException e) {
-                            mChatAdapter.markAllMessagesAsRead();
-                        }
-                    });
+                                @Override
+                                public void onResult(List<BaseMessage> list, SendBirdException e) {
+                                    mChatAdapter.markAllMessagesAsRead();
+                                }
+                            });
                     updateActionBarTitle();
                 }
             });
@@ -295,7 +312,7 @@ public class GroupChatFragment extends Fragment {
         super.onResume();
 
         ConnectionManager.
-                addConnectionManagementHandler(CONNECTION_HANDLER_ID,chatUserId,
+                addConnectionManagementHandler(CONNECTION_HANDLER_ID, chatUserId,
                         reconnect -> refresh());
 
         mChatAdapter.setContext(getActivity()); // Glide bug fix (java.lang.IllegalArgumentException: You cannot start a load for a destroyed activity)
@@ -306,53 +323,53 @@ public class GroupChatFragment extends Fragment {
 
         SendBird.addChannelHandler(CHANNEL_HANDLER_ID,
                 new SendBird.ChannelHandler() {
-            @Override
-            public void onMessageReceived(BaseChannel baseChannel, BaseMessage baseMessage) {
-                if (baseChannel.getUrl().equals(mChannelUrl)) {
-                    mChatAdapter.markAllMessagesAsRead();
-                    // Add new message to view
-                    mChatAdapter.addFirst(baseMessage);
-                }
-            }
+                    @Override
+                    public void onMessageReceived(BaseChannel baseChannel, BaseMessage baseMessage) {
+                        if (baseChannel.getUrl().equals(mChannelUrl)) {
+                            mChatAdapter.markAllMessagesAsRead();
+                            // Add new message to view
+                            mChatAdapter.addFirst(baseMessage);
+                        }
+                    }
 
-            @Override
-            public void onMessageDeleted(BaseChannel baseChannel, long msgId) {
-                super.onMessageDeleted(baseChannel, msgId);
-                if (baseChannel.getUrl().equals(mChannelUrl)) {
-                    mChatAdapter.delete(msgId);
-                }
-            }
+                    @Override
+                    public void onMessageDeleted(BaseChannel baseChannel, long msgId) {
+                        super.onMessageDeleted(baseChannel, msgId);
+                        if (baseChannel.getUrl().equals(mChannelUrl)) {
+                            mChatAdapter.delete(msgId);
+                        }
+                    }
 
-            @Override
-            public void onMessageUpdated(BaseChannel channel, BaseMessage message) {
-                super.onMessageUpdated(channel, message);
-                if (channel.getUrl().equals(mChannelUrl)) {
-                    mChatAdapter.update(message);
-                }
-            }
+                    @Override
+                    public void onMessageUpdated(BaseChannel channel, BaseMessage message) {
+                        super.onMessageUpdated(channel, message);
+                        if (channel.getUrl().equals(mChannelUrl)) {
+                            mChatAdapter.update(message);
+                        }
+                    }
 
-            @Override
-            public void onReadReceiptUpdated(GroupChannel channel) {
-                if (channel.getUrl().equals(mChannelUrl)) {
-                    mChatAdapter.notifyDataSetChanged();
-                }
-            }
+                    @Override
+                    public void onReadReceiptUpdated(GroupChannel channel) {
+                        if (channel.getUrl().equals(mChannelUrl)) {
+                            mChatAdapter.notifyDataSetChanged();
+                        }
+                    }
 
-            @Override
-            public void onTypingStatusUpdated(GroupChannel channel) {
-                if (channel.getUrl().equals(mChannelUrl)) {
-                    List<Member> typingUsers = channel.getTypingMembers();
-                    displayTyping(typingUsers);
-                }
-            }
+                    @Override
+                    public void onTypingStatusUpdated(GroupChannel channel) {
+                        if (channel.getUrl().equals(mChannelUrl)) {
+                            List<Member> typingUsers = channel.getTypingMembers();
+                            displayTyping(typingUsers);
+                        }
+                    }
 
-            @Override
-            public void onDeliveryReceiptUpdated(GroupChannel channel) {
-                if (channel.getUrl().equals(mChannelUrl)) {
-                    mChatAdapter.notifyDataSetChanged();
-                }
-            }
-        });
+                    @Override
+                    public void onDeliveryReceiptUpdated(GroupChannel channel) {
+                        if (channel.getUrl().equals(mChannelUrl)) {
+                            mChatAdapter.notifyDataSetChanged();
+                        }
+                    }
+                });
     }
 
     @Override
@@ -394,38 +411,43 @@ public class GroupChatFragment extends Fragment {
 
             if (data.getData().toString().contains("image")) {
 
-                        Uri selectedImageUri = data.getData();
+                Uri selectedImageUri = data.getData();
                 try {
                     Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContext().getContentResolver(), selectedImageUri);
 
 //                    Bitmap galleryImageBitmap= FileUtils.reduceBitmapSize( (Bitmap)new UserPicture(selectedImageUri, getContext().getContentResolver()).getBitmap(),1000000);
-                    Uri imageUri=getImageUri(getContext(),bitmap);
+                    Uri imageUri = getImageUri(getContext(), bitmap);
                     sendFileWithThumbnail(imageUri);
 
                 } catch (IOException e) {
                     Log.e(MainActivity.class.getSimpleName(), "Failed to load image", e);
-                };          //handle image
+                }
+                //handle image
 
-            } else  if (data.getData().toString().contains("video")) {
+            } else if (data.getData().toString().contains("video")) {
                 //handle video
                 sendFileWithThumbnail(data.getData());
             }
-        }
-        else if (requestCode == INTENT_REQUEST_CAMERA && resultCode == Activity.RESULT_OK) {
+        } else if (requestCode == INTENT_REQUEST_CAMERA && resultCode == Activity.RESULT_OK) {
             // If user has successfully chosen the image, show a dialog to confirm upload.
             try {
-                Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContext().getContentResolver(), cameraUri);
-                Log.e("fileSizeBeforeReduce", "onActivityResult: "+FileUtils.sizeOf(bitmap) );
-                Bitmap galleryImageBitmap= FileUtils.reduceBitmapSize(bitmap,100000);
-                Log.e("fileSizeAfterReduce", "onActivityResult: "+FileUtils.sizeOf(galleryImageBitmap) );
+//                Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContext().getContentResolver(), cameraUri);
+//                Log.e("fileSizeBeforeReduce", "onActivityResult: "+FileUtils.sizeOf(bitmap) );
+//                Bitmap galleryImageBitmap= FileUtils.reduceBitmapSize(bitmap,100000);
+//                Log.e("fileSizeAfterReduce", "onActivityResult: "+FileUtils.sizeOf(galleryImageBitmap) );
+//
+//                Uri imageUri=getImageUri(getContext(),galleryImageBitmap);
 
-                Uri imageUri=getImageUri(getContext(),galleryImageBitmap);
-                sendFileWithThumbnail(imageUri);
+                Uri uri = data.getData();
 
-            }catch (FileNotFoundException e)
+                sendFileWithThumbnail(uri);
+
+            }
+
+            /*catch (FileNotFoundException e)
             {
                 e.printStackTrace();
-            }catch (Exception e){
+            }*/ catch (Exception e) {
                 e.printStackTrace();
             }
 
@@ -437,21 +459,6 @@ public class GroupChatFragment extends Fragment {
         inImage.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
         String path = MediaStore.Images.Media.insertImage(inContext.getContentResolver(), inImage, "Title", null);
         return Uri.parse(path);
-    }
-
-    public static Bitmap reduceBitmapSize(Bitmap bitmap, int MAX_SIZE) {
-        double ratioSquare;
-        int bitmapHeight, bitmapWidth;
-        bitmapHeight = bitmap.getHeight();
-        bitmapWidth = bitmap.getWidth();
-        ratioSquare = (bitmapHeight * bitmapWidth) / MAX_SIZE;
-        if (ratioSquare <= 1)
-            return bitmap;
-        double ratio = Math.sqrt(ratioSquare);
-        Log.d("mylog", "Ratio: " + ratio);
-        int requiredHeight = (int) Math.round(bitmapHeight / ratio);
-        int requiredWidth = (int) Math.round(bitmapWidth / ratio);
-        return Bitmap.createScaledBitmap(bitmap, requiredWidth, requiredHeight, true);
     }
 
     private void setUpRecyclerView() {
@@ -533,7 +540,7 @@ public class GroupChatFragment extends Fragment {
     }
 
     private void showMessageOptionsDialog(final BaseMessage message, final int position) {
-        String[] options = new String[] { "Edit message", "Delete message" };
+        String[] options = new String[]{"Edit message", "Delete message"};
 
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
         builder.setItems(options, new DialogInterface.OnClickListener() {
@@ -549,32 +556,121 @@ public class GroupChatFragment extends Fragment {
         builder.create().show();
     }
 
-    Uri cameraUri;
-    private void openCameraOrGallery( )
-    {
-        String[] options = new String[] { "Camera", "Gallery" };
+    private void openCameraOrGallery() {
+        String[] options = new String[]{"Audio", "Gallery"};
 
         AlertDialog.Builder builder = new AlertDialog.Builder(getActivity());
         builder.setItems(options, new DialogInterface.OnClickListener() {
             @Override
-            public void onClick(DialogInterface dialog, int which) {
+            public void onClick(DialogInterface dialog1, int which) {
                 if (which == 0) {
+                    startRecording();
 
-                    ContentValues values = new ContentValues();
-                    values.put(MediaStore.Images.Media.TITLE, "New Picture");
-                    values.put(MediaStore.Images.Media.DESCRIPTION, "From the Camera");
-                    Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
-                     cameraUri= getContext().getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+//                    startActivity(new Intent(getContext(), AudioRecoding.class));
 
-                    cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
-                    startActivityForResult(cameraIntent, INTENT_REQUEST_CAMERA);
+                    Button btStartRecording, btPauseRecording, btPlayRecording, btStopRecording, btClose, btSendAudioFile;
+
+                    Dialog progresschatDialog = new Dialog(getContext());
+                    progresschatDialog.setContentView(R.layout.dialog_audio);
+                    progresschatDialog.setCancelable(true);
+//                    progresschatDialog.getWindow().setBackgroundDrawableResource(R.color.transparent);
+                    btStartRecording = progresschatDialog.findViewById(R.id.btStartAudio);
+                    btPlayRecording = progresschatDialog.findViewById(R.id.btPlayAudio);
+                    btStopRecording = progresschatDialog.findViewById(R.id.btStopAudio);
+                    btPauseRecording = progresschatDialog.findViewById(R.id.btPauseAudio);
+                    btSendAudioFile = progresschatDialog.findViewById(R.id.btSendAudioFile);
+                    btStartRecording.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            btStopRecording.setVisibility(View.GONE);
+                            btPauseRecording.setVisibility(View.VISIBLE);
+                            btPlayRecording.setVisibility(View.GONE);
+                            startRecording();
+                        }
+                    });
+
+                    // stop recoding and visible send buttons
+                    btStopRecording.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+
+                            btStopRecording.setVisibility(View.GONE);
+                            btPauseRecording.setVisibility(View.GONE);
+                            btPlayRecording.setVisibility(View.GONE);
+                            btSendAudioFile.setVisibility(View.VISIBLE);
+                            pauseRecording();
+                        }
+                    });
+
+
+                    // send audio
+                    btSendAudioFile.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+
+                            btStopRecording.setVisibility(View.GONE);
+                            btPauseRecording.setVisibility(View.VISIBLE);
+                            btSendAudioFile.setVisibility(View.GONE);
+                            btPlayRecording.setVisibility(View.VISIBLE);
+                            sendAudioFileWithThumbnail(Uri.fromFile(new File(mFileName)));
+                        }
+                    });
+
+                    // play audio
+                    btPlayRecording.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+
+                            btStopRecording.setVisibility(View.GONE);
+                            btPauseRecording.setVisibility(View.VISIBLE);
+                            btStartRecording.setVisibility(View.GONE);
+                            playAudio();
+
+                        }
+                    });
+                    // stop audio recoring player
+                    btPauseRecording.setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+
+                            btStopRecording.setVisibility(View.GONE);
+                            btPauseRecording.setVisibility(View.GONE);
+                            btPlayRecording.setVisibility(View.VISIBLE);
+                            btSendAudioFile.setVisibility(View.GONE);
+                            pausePlaying();
+                        }
+                    });
+
+                    progresschatDialog.findViewById(R.id.btClose).setOnClickListener(new View.OnClickListener() {
+                        @Override
+                        public void onClick(View v) {
+                            progresschatDialog.dismiss();
+                        }
+                    });
+
+                    progresschatDialog.show();
+
+
+//                    Dialog audio=new Dialog(getContext());
+//                    dialog1.set(R.layout.dialog_audio);
+
+
+//                    ContentValues values = new ContentValues();
+//                    values.put(MediaStore.Images.Media.TITLE, "New Picture");
+//                    values.put(MediaStore.Images.Media.DESCRIPTION, "From the Camera");
+//                    Intent cameraIntent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+//                     cameraUri= getContext().getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
+//
+//                    cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, cameraUri);
+//                    startActivityForResult(cameraIntent, INTENT_REQUEST_CAMERA);
 
                     SendBird.setAutoBackgroundDetection(false);
 
                 } else if (which == 1) {
                     Intent intent = new Intent();
 
-                    intent.setType("image/* video/*");
+                    intent.setType("image/* " +
+                            "");
 
                     intent.setAction(Intent.ACTION_GET_CONTENT);
 
@@ -588,6 +684,167 @@ public class GroupChatFragment extends Fragment {
             }
         });
         builder.create().show();
+    }
+
+    private String getFilename() {
+
+
+
+
+        String filepath = Environment.getExternalStorageDirectory().getPath();
+        File file = new File(filepath, "SuvichRecording");
+
+        if (!file.exists()) {
+            file.mkdirs();
+        }
+
+        fileName = System.currentTimeMillis() + ".mp3";
+        try {
+            file.createNewFile();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return (file.getAbsolutePath() + "/" + fileName);
+    }
+
+    // start audio recording
+    private void startRecording() {
+        // check permission method is used to check that the user has granted permission to record nd store the audio.
+        if (CheckPermissions()) {
+            //setbackgroundcolor method will change the background color of text view.
+//            stopTV.setBackgroundColor(getResources().getColor(R.color.purple_200));
+//            startTV.setBackgroundColor(getResources().getColor(R.color.gray));
+//            playTV.setBackgroundColor(getResources().getColor(R.color.gray));
+//            stopplayTV.setBackgroundColor(getResources().getColor(R.color.gray));
+            //we are here initializing our filename variable with the path of the recorded audio file.
+//            mFileName = Environment.getExternalStorageDirectory().getAbsolutePath();
+//            mFileName += "/AudioRecording.mp3";
+
+            mFileName = getFilename();
+
+
+            //below method is used to initialize the media recorder clss
+            mRecorder = new MediaRecorder();
+            //below method is used to set the audio source which we are using a mic.
+            mRecorder.setAudioSource(MediaRecorder.AudioSource.MIC);
+            //below method is used to set the output format of the audio.
+            mRecorder.setOutputFormat(MediaRecorder.OutputFormat.THREE_GPP);
+            //below method is used to set the audio encoder for our recorded audio.
+            mRecorder.setAudioEncoder(MediaRecorder.AudioEncoder.AMR_NB);
+            //below method is used to set the output file location for our recorded audio
+            mRecorder.setOutputFile(mFileName);
+            try {
+                //below mwthod will prepare our audio recorder class
+                mRecorder.prepare();
+            } catch (IOException e) {
+                throw new RuntimeException("Crash  "+e.getMessage()); // Force a crash
+
+            }
+            // start method will start the audio recording.
+            mRecorder.start();
+
+
+
+//            statusTV.setText("Recording Started");
+        } else {
+            //if audio recording permissions are not granted by user below method will ask for runtime permission for mic and storage.
+            RequestPermissions();
+        }
+    }
+
+    // stop audio recording
+    public void pauseRecording() {
+//        stopTV.setBackgroundColor(getResources().getColor(R.color.gray));
+//        startTV.setBackgroundColor(getResources().getColor(R.color.purple_200));
+//        playTV.setBackgroundColor(getResources().getColor(R.color.purple_200));
+//        stopplayTV.setBackgroundColor(getResources().getColor(R.color.purple_200));
+
+        // below method will stop
+        // the audio recording.
+        mRecorder.stop();
+
+        // below method will release
+        // the media recorder class.
+        mRecorder.release();
+
+        Context context;
+        CharSequence text;
+        Toast.makeText(getContext(), "file save : " + mFileName, Toast.LENGTH_LONG).show();
+        mRecorder = null;
+//        statusTV.setText("Recording Stopped");
+    }
+
+    // play audio recording
+    public void playAudio() {
+//        stopTV.setBackgroundColor(getResources().getColor(R.color.gray));
+//        startTV.setBackgroundColor(getResources().getColor(R.color.purple_200));
+//        playTV.setBackgroundColor(getResources().getColor(R.color.gray));
+//        stopplayTV.setBackgroundColor(getResources().getColor(R.color.purple_200));
+
+        // for playing our recorded audio
+        // we are using media player class.
+        mPlayer = new MediaPlayer();
+        try {
+            // below method is used to set the
+            // data source which will be our file name
+            mPlayer.setDataSource(mFileName);
+
+            // below method will prepare our media player
+            mPlayer.prepare();
+
+            // below method will start our media player.
+            mPlayer.start();
+//            statusTV.setText("Recording Started Playing");
+        } catch (IOException e) {
+            Log.e("TAG", "prepare() failed");
+        }
+    }
+
+    // stop playing audio recording
+    public void pausePlaying() {
+        // this method will release the media player
+        // class and pause the playing of our recorded audio.
+        mPlayer.release();
+        mPlayer = null;
+//        stopTV.setBackgroundColor(getResources().getColor(R.color.gray));
+//        startTV.setBackgroundColor(getResources().getColor(R.color.purple_200));
+//        playTV.setBackgroundColor(getResources().getColor(R.color.purple_200));
+//        stopplayTV.setBackgroundColor(getResources().getColor(R.color.gray));
+//        statusTV.setText("Recording Play Stopped");
+    }
+
+    // check audio permissions
+    public boolean CheckPermissions() {
+        // this method is used to check permission
+        int result = ContextCompat.checkSelfPermission(getActivity(), WRITE_EXTERNAL_STORAGE);
+        int result1 = ContextCompat.checkSelfPermission(getActivity(), RECORD_AUDIO);
+        return result == PackageManager.PERMISSION_GRANTED && result1 == PackageManager.PERMISSION_GRANTED;
+    }
+
+    // request permissions
+    private void RequestPermissions() {
+        // this method is used to request the
+        // permission for audio recording and storage.
+        ActivityCompat.requestPermissions(getActivity(), new String[]{RECORD_AUDIO, WRITE_EXTERNAL_STORAGE}, REQUEST_AUDIO_PERMISSION_CODE);
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        // this method is called when user will
+        // grant the permission for audio recording.
+        switch (requestCode) {
+            case REQUEST_AUDIO_PERMISSION_CODE:
+                if (grantResults.length > 0) {
+                    boolean permissionToRecord = grantResults[0] == PackageManager.PERMISSION_GRANTED;
+                    boolean permissionToStore = grantResults[1] == PackageManager.PERMISSION_GRANTED;
+                    if (permissionToRecord && permissionToStore) {
+                        Toast.makeText(getActivity(), "Permission Granted", Toast.LENGTH_LONG).show();
+                    } else {
+                        Toast.makeText(getActivity(), "Permission Denied", Toast.LENGTH_LONG).show();
+                    }
+                }
+                break;
+        }
     }
 
     private void setState(int state, BaseMessage editingMessage, final int position) {
@@ -607,7 +864,7 @@ public class GroupChatFragment extends Fragment {
 
                 mUploadFileButton.setVisibility(View.GONE);
                 mMessageSendButton.setText("SAVE");
-                String messageString = ((UserMessage)editingMessage).getMessage();
+                String messageString = editingMessage.getMessage();
                 if (messageString == null) {
                     messageString = "";
                 }
@@ -637,7 +894,7 @@ public class GroupChatFragment extends Fragment {
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        ((MainActivity)context).setOnBackPressedListener(new MainActivity.onBackPressedListener() {
+        ((MainActivity) context).setOnBackPressedListener(new MainActivity.onBackPressedListener() {
             @Override
             public boolean onBack() {
                 if (mCurrentState == STATE_EDIT) {
@@ -660,7 +917,7 @@ public class GroupChatFragment extends Fragment {
                     public void onClick(DialogInterface dialog, int which) {
                         if (which == DialogInterface.BUTTON_POSITIVE) {
                             if (message instanceof UserMessage) {
-                                String userInput = ((UserMessage) message).getMessage();
+                                String userInput = message.getMessage();
                                 sendUserMessage(userInput);
                             } else if (message instanceof FileMessage) {
                                 Uri uri = mChatAdapter.getTempFileMessageUri(message);
@@ -706,19 +963,19 @@ public class GroupChatFragment extends Fragment {
     }
 
     private void requestMedia() {
-        if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        if (ContextCompat.checkSelfPermission(getActivity(), WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
             // If storage permissions are not granted, request permissions at run-time,
             // as per < API 23 guidelines.
             requestStoragePermissions();
         } else {
-           openCameraOrGallery();
+            openCameraOrGallery();
         }
     }
 
     private void requestStoragePermissions() {
         if (ActivityCompat.shouldShowRequestPermissionRationale(getActivity(),
-                Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
+                WRITE_EXTERNAL_STORAGE)) {
             // Provide an additional rationale to the user if the permission was not granted
             // and the user would benefit from additional context for the use of the permission.
             // For example if the user has previously denied the permission.
@@ -727,14 +984,14 @@ public class GroupChatFragment extends Fragment {
                     .setAction("Okay", new View.OnClickListener() {
                         @Override
                         public void onClick(View view) {
-                            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+                            requestPermissions(new String[]{WRITE_EXTERNAL_STORAGE},
                                     PERMISSION_WRITE_EXTERNAL_STORAGE);
                         }
                     })
                     .show();
         } else {
             // Permission has not been granted yet. Request it directly.
-            requestPermissions(new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
+            requestPermissions(new String[]{WRITE_EXTERNAL_STORAGE},
                     PERMISSION_WRITE_EXTERNAL_STORAGE);
         }
     }
@@ -750,13 +1007,87 @@ public class GroupChatFragment extends Fragment {
             Intent intent = new Intent(getActivity(), MediaPlayerActivity.class);
             intent.putExtra("url", message.getUrl());
             startActivity(intent);
+        } else if (type.startsWith("audio")) {
+            dialogForPlayAudio(message);
+
         } else {
             showDownloadConfirmDialog(message);
         }
     }
 
+    private void dialogForPlayAudio(FileMessage message) {
+        if (message.getUrl().length() != 0) {
+            if (alreadyPlay) {
+                stopPlaying();
+                alreadyPlay = false;
+            } else {
+                alreadyPlay = true;
+                onRadioClick(message.getUrl());
+            }
+
+        }
+
+//
+//        Button btStartRecording,btPauseRecording,btPlayRecording,btStopRecording,btClose,btSendAudioFile;
+//
+//        Dialog progresschatDialog=new Dialog(getContext());
+//        progresschatDialog.setContentView(R.layout.dialog_audio);
+//        progresschatDialog.setCancelable(true);
+//        btStartRecording= progresschatDialog.findViewById(R.id.btStartAudio);
+//        btPlayRecording= progresschatDialog.findViewById(R.id.btPlayAudio);
+//        btStopRecording= progresschatDialog.findViewById(R.id.btStopAudio);
+//        btPauseRecording= progresschatDialog.findViewById(R.id.btPauseAudio);
+//        btSendAudioFile= progresschatDialog.findViewById(R.id.btSendAudioFile);
+//      btPlayRecording.setVisibility(View.VISIBLE);
+//        btPauseRecording.setVisibility(View.VISIBLE);
+//        btStopRecording.setVisibility(View.GONE);
+//
+//        // stop recoding and visible send buttons
+//        btPlayRecording.setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//
+//                btStopRecording.setVisibility(View.GONE);
+//onRadioClick(message.getUrl());            }
+//        });
+//
+
+
+    }
+
+    public void onRadioClick(String url) {
+
+
+            try {
+                if (url.equals(null) || url.isEmpty()) {
+                    return;
+                }
+                mediaPlayer=new MediaPlayer();
+                mediaPlayer.setAudioAttributes(
+                        new AudioAttributes.Builder()
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
+                                .build()
+                );
+                mediaPlayer.setDataSource(url);
+                mediaPlayer.prepare(); // might take long! (for buffering, etc)
+                mediaPlayer.start();
+
+
+            } catch (IOException e) {
+                Log.e(LOG_TAG, "prepare() failed");
+            }
+
+    }
+
+    private void stopPlaying() {
+//        mediaPlayer.stop();
+        mediaPlayer.release();
+        mediaPlayer=null;
+    }
+
     private void showDownloadConfirmDialog(final FileMessage message) {
-        if (ContextCompat.checkSelfPermission(getActivity(), Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        if (ContextCompat.checkSelfPermission(getActivity(), WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
             // If storage permissions are not granted, request permissions at run-time,
             // as per < API 23 guidelines.
@@ -781,7 +1112,7 @@ public class GroupChatFragment extends Fragment {
     private void updateActionBarTitle() {
         String title = "";
 
-        if(mChannel != null) {
+        if (mChannel != null) {
             title = TextUtils.getGroupChannelTitle(mChannel);
         }
 
@@ -896,49 +1227,50 @@ public class GroupChatFragment extends Fragment {
         }
     }
 
+
     /**
      * Sends a File Message containing an image file.
      * Also requests thumbnails to be generated in specified sizes.
      *
      * @param uri The URI of the image, which in this case is received through an Intent request.
      */
-    private void sendFile(Bitmap uri) {
+    private void sendAudioFileWithThumbnail(Uri uri) {
         if (mChannel == null) {
             return;
         }
-//      File image=  FileUtils.savePickUpPersonImage(getContext(),uri)
 
+        // Specify two dimensions of thumbnails to generate
+        List<FileMessage.ThumbnailSize> thumbnailSizes = new ArrayList<FileMessage.ThumbnailSize>();
+        thumbnailSizes.add(new FileMessage.ThumbnailSize(240, 240));
+        thumbnailSizes.add(new FileMessage.ThumbnailSize(320, 320));
 
-        // Creating and adding a ThumbnailSize object (allowed number of thumbnail images: 3).
-        List<FileMessage.ThumbnailSize> thumbnailSizes = new ArrayList<>();
-        thumbnailSizes.add(new FileMessage.ThumbnailSize(100,100));
-        thumbnailSizes.add(new FileMessage.ThumbnailSize(200,200));
-        Log.e("dataSize", "sendFileWithThumbnail: "+thumbnailSizes.size() );
+        final File file = new File(mFileName);
 
+        final String mime = getContext().getContentResolver().getType(uri);
+        final int size = Integer.parseInt(String.valueOf(file.length() / 1024));
 
-
-            BaseChannel.SendFileMessageHandler fileMessageHandler = new BaseChannel.SendFileMessageHandler() {
-                @Override
-                public void onSent(FileMessage fileMessage, SendBirdException e) {
-                    if (e != null) {
-                        if (getActivity() != null) {
-                            Toast.makeText(getActivity(), "" + e.getCode() + ":" + e.getMessage(), Toast.LENGTH_SHORT).show();
-                        }
-                        mChatAdapter.markMessageFailed(fileMessage);
-                        return;
+        if (mFileName == null || mFileName.equals("")) {
+            Toast.makeText(getActivity(), "File must be located in local storage.", Toast.LENGTH_LONG).show();
+        } else {
+            BaseChannel.SendFileMessageHandler fileMessageHandler = (fileMessage, e) -> {
+                if (e != null) {
+                    if (getActivity() != null) {
+                        Toast.makeText(getActivity(), "" + e.getCode() + ":" + e.getMessage(), Toast.LENGTH_SHORT).show();
                     }
-
-                    mChatAdapter.markMessageSent(fileMessage);
+                    mChatAdapter.markMessageFailed(fileMessage);
+                    return;
                 }
+
+                mChatAdapter.markMessageSent(fileMessage);
             };
 
             // Send image with thumbnails in the specified dimensions
-//            FileMessage tempFileMessage = mChannel.sendFileMessage(params, fileMessageHandler);
-//
-//            mChatAdapter.addTempFileMessageInfo(tempFileMessage, uri);
-//            mChatAdapter.addFirst(tempFileMessage);
-        }
+            FileMessage tempFileMessage = mChannel.sendFileMessage(file, fileName, mime, size, "", null, thumbnailSizes, fileMessageHandler);
 
+            mChatAdapter.addTempFileMessageInfo(tempFileMessage, uri);
+            mChatAdapter.addFirst(tempFileMessage);
+        }
+    }
 
     /**
      * Sends a File Message containing an image file.
@@ -966,22 +1298,20 @@ public class GroupChatFragment extends Fragment {
         final String name;
         if (info.containsKey("name")) {
             name = (String) info.get("name");
-        }
-        else {
+        } else {
             name = "Sendbird File";
         }
         final String path = (String) info.get("path");
         final File file = new File(path);
-        int file_size = Integer.parseInt(String.valueOf(file.length()/1024));
-        Log.e("MyFilesSize", "sendFileWithThumbnail: "+file_size );
+        int file_size = Integer.parseInt(String.valueOf(file.length() / 1024));
+        Log.e("MyFilesSize", "sendFileWithThumbnail: " + file_size);
 
         final String mime = (String) info.get("mime");
         final int size = (Integer) info.get("size");
 
         if (path == null || path.equals("")) {
             Toast.makeText(getActivity(), "File must be located in local storage.", Toast.LENGTH_LONG).show();
-        }
-        else {
+        } else {
             BaseChannel.SendFileMessageHandler fileMessageHandler = (fileMessage, e) -> {
                 if (e != null) {
                     if (getActivity() != null) {

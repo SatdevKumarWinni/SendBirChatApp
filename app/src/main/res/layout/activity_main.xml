@@ -26,7 +26,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:hint="Enter UserId"
-            android:text="9877580206"
+            android:text="1234"
             />
         <EditText
             android:id="@+id/etUserName"
@@ -94,7 +94,7 @@
             android:id="@+id/etChatUserId"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="7508608223"
+            android:text="9874563210"
 
             />
 

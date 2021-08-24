@@ -127,7 +127,7 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
 
     public void sendBirdInit() {
         // Initialize SendBird instance to use APIs in your app.
-        SendBird.init("A2305BC6-FA8D-47D9-8393-30A7AB757CD0", getApplicationContext());
+        SendBird.init("C953ED98-13AC-4EDE-92B7-41CE8756844B", getApplicationContext());
         llUserLogin.setVisibility(View.VISIBLE);
         btDone.setVisibility(View.GONE);
 

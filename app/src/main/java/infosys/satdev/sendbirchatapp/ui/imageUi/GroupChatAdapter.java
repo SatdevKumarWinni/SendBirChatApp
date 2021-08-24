@@ -9,6 +9,7 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.sendbird.android.AdminMessage;
@@ -47,6 +48,8 @@ class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int VIEW_TYPE_USER_MESSAGE_OTHER = 11;
     private static final int VIEW_TYPE_FILE_MESSAGE_ME = 20;
     private static final int VIEW_TYPE_FILE_MESSAGE_OTHER = 21;
+    private static final int VIEW_TYPE_AUDIO_FILE_MESSAGE_ME = 32;
+    private static final int VIEW_TYPE_AUDIO_FILE_MESSAGE_OTHER = 31;
     private static final int VIEW_TYPE_FILE_MESSAGE_IMAGE_ME = 22;
     private static final int VIEW_TYPE_FILE_MESSAGE_IMAGE_OTHER = 23;
     private static final int VIEW_TYPE_FILE_MESSAGE_VIDEO_ME = 24;
@@ -181,6 +184,18 @@ class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 View otherFileMsgView = LayoutInflater.from(parent.getContext())
                         .inflate(R.layout.list_item_group_chat_file_other, parent, false);
                 return new OtherFileMessageHolder(otherFileMsgView);
+
+                // todo changes for audio files
+            case VIEW_TYPE_AUDIO_FILE_MESSAGE_ME:
+                View meAudioFileMsgView = LayoutInflater.from(parent.getContext())
+                        .inflate(R.layout.list_item_group_chat_audio_file_me, parent, false);
+                return new MeAudioFileMessageHolder(meAudioFileMsgView);
+            case VIEW_TYPE_AUDIO_FILE_MESSAGE_OTHER:
+                View otherAudioFileMsgView = LayoutInflater.from(parent.getContext())
+                        .inflate(R.layout.list_item_group_chat_audio_file_other, parent, false);
+                return new OtherAudioFileMessageHolder(otherAudioFileMsgView);
+
+
             case VIEW_TYPE_FILE_MESSAGE_IMAGE_ME:
                 View myImageFileMsgView = LayoutInflater.from(parent.getContext())
                         .inflate(R.layout.list_item_group_chat_file_image_me, parent, false);
@@ -251,6 +266,16 @@ class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             case VIEW_TYPE_FILE_MESSAGE_OTHER:
                 ((OtherFileMessageHolder) holder).bind(mContext, (FileMessage) message, mChannel, isNewDay, isContinuous, mItemClickListener);
                 break;
+
+                // todo chages for audio files,
+            case VIEW_TYPE_AUDIO_FILE_MESSAGE_OTHER:
+                ((OtherAudioFileMessageHolder) holder).bind(mContext, (FileMessage) message, mChannel, isNewDay, isContinuous, mItemClickListener);
+                break;
+            case VIEW_TYPE_AUDIO_FILE_MESSAGE_ME:
+                ((MeAudioFileMessageHolder) holder).bind(mContext, (FileMessage) message, mChannel, isNewDay, isContinuous, mItemClickListener);
+                break;
+
+
             case VIEW_TYPE_FILE_MESSAGE_IMAGE_ME:
                 ((MyImageFileMessageHolder) holder).bind(mContext, (FileMessage) message, mChannel, isNewDay, isTempMessage, tempFileMessageUri, mItemClickListener);
                 break;
@@ -300,7 +325,21 @@ class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 } else {
                     return VIEW_TYPE_FILE_MESSAGE_VIDEO_OTHER;
                 }
-            } else {
+
+            }
+
+            // todo change for audio files
+
+            else if (fileMessage.getType().toLowerCase().startsWith("audio")) {
+                if (fileMessage.getSender().getUserId().equals(SendBird.getCurrentUser().getUserId())) {
+                    return VIEW_TYPE_AUDIO_FILE_MESSAGE_ME;
+                } else {
+                    return VIEW_TYPE_AUDIO_FILE_MESSAGE_OTHER;
+                }
+
+            }
+
+            else {
                 if (fileMessage.getSender().getUserId().equals(SendBird.getCurrentUser().getUserId())) {
                     return VIEW_TYPE_FILE_MESSAGE_ME;
                 } else {
@@ -866,6 +905,99 @@ class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 itemView.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
+                        listener.onFileMessageItemClick(message);
+                    }
+                });
+            }
+        }
+    }
+
+    private class MeAudioFileMessageHolder extends RecyclerView.ViewHolder {
+        TextView nicknameText, timeText, fileNameText, fileSizeText, dateText,tvPlay,tvStop,tvFileName;
+        ImageView ivPlayAudio;
+
+        public MeAudioFileMessageHolder(View itemView) {
+            super(itemView);
+            tvFileName = (TextView) itemView.findViewById(R.id.tvFileName);
+            ivPlayAudio = (ImageView) itemView.findViewById(R.id.ivPlayAudio);
+            dateText = (TextView) itemView.findViewById(R.id.text_group_chat_date);
+
+//            fileSizeText = (TextView) itemView.findViewById(R.id.text_group_chat_file_size);
+
+        }
+
+        void bind(Context context, final FileMessage message, GroupChannel channel, boolean isNewDay, boolean isContinuous, final OnItemClickListener listener) {
+
+            tvFileName.setText(String.valueOf(message.getName()));
+            // Show the date if the message was sent on a different date than the previous message.
+            if (isNewDay) {
+                dateText.setVisibility(View.VISIBLE);
+                dateText.setText(DateUtils.formatDate(message.getCreatedAt()));
+            } else {
+                dateText.setVisibility(View.GONE);
+            }
+            final boolean[] isPlay = {false};
+
+
+            if (listener != null) {
+                ivPlayAudio.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        if (isPlay[0]){
+                            isPlay[0] =false;
+                            ivPlayAudio.setBackgroundDrawable(ContextCompat.getDrawable(context, R.drawable.ic_play) );
+                        }else {
+                            ivPlayAudio.setBackgroundDrawable(ContextCompat.getDrawable(context, R.drawable.ic_baseline_pause_circle_filled_24) );
+isPlay[0] =true;
+                        }
+
+                        listener.onFileMessageItemClick(message);
+
+                    }
+                });
+            }
+        }
+    }
+
+
+    private class OtherAudioFileMessageHolder extends RecyclerView.ViewHolder {
+        TextView nicknameText, timeText, fileNameText, fileSizeText, dateText,tvFileName;
+        ImageView ivPlayAudio;
+
+        public OtherAudioFileMessageHolder(View itemView) {
+            super(itemView);
+
+            tvFileName = (TextView) itemView.findViewById(R.id.tvFileName);
+            ivPlayAudio = (ImageView) itemView.findViewById(R.id.ivPlayAudio);
+            dateText = (TextView) itemView.findViewById(R.id.text_group_chat_date);
+        }
+
+        void bind(Context context, final FileMessage message, GroupChannel channel, boolean isNewDay, boolean isContinuous, final OnItemClickListener listener) {
+            tvFileName.setText(message.getName());
+//            timeText.setText(DateUtils.formatTime(message.getCreatedAt()));
+//            fileSizeText.setText(String.valueOf(message.getSize()));
+
+            // Show the date if the message was sent on a different date than the previous message.
+            if (isNewDay) {
+                dateText.setVisibility(View.VISIBLE);
+                dateText.setText(DateUtils.formatDate(message.getCreatedAt()));
+            } else {
+                dateText.setVisibility(View.GONE);
+            }
+
+            final boolean[] isPlay = {false};
+
+            if (listener != null) {
+                itemView.setOnClickListener(new View.OnClickListener() {
+                    @Override
+                    public void onClick(View v) {
+                        if (isPlay[0]){
+                            isPlay[0] =false;
+                            ivPlayAudio.setBackgroundDrawable(ContextCompat.getDrawable(context, R.drawable.ic_play) );
+                        }else {
+                            ivPlayAudio.setBackgroundDrawable(ContextCompat.getDrawable(context, R.drawable.ic_baseline_pause_circle_filled_24) );
+                            isPlay[0] =true;
+                        }
                         listener.onFileMessageItemClick(message);
                     }
                 });
