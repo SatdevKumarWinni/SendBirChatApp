@@ -11,6 +11,18 @@
     android:paddingStart="5dp"
     app:layout_behavior="@string/appbar_scrolling_view_behavior">
 
+    <ImageView
+        android:id="@+id/ivRecording"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
+        android:layout_marginBottom="25dp"
+        android:src="@drawable/ic_icon_recoding"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent" />
+
+
     <Button
         android:id="@+id/btStartAudio"
         android:layout_width="wrap_content"
@@ -18,8 +30,7 @@
         android:visibility="gone"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        android:text="Start Audio"
-        />
+        android:text="Start Audio" />
 
     <Button
         android:id="@+id/btStopAudio"

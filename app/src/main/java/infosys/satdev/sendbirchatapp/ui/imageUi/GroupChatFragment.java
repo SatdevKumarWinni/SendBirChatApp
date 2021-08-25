@@ -14,6 +14,7 @@ import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.media.MediaRecorder;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
@@ -578,7 +579,7 @@ public class GroupChatFragment extends Fragment {
 //                    startActivity(new Intent(getContext(), AudioRecoding.class));
 
                     Button btStartRecording, btPauseRecording, btPlayRecording, btStopRecording, btClose, btSendAudioFile;
-
+                    ImageView ivRecording;
                     Dialog progresschatDialog = new Dialog(getContext());
                     progresschatDialog.setContentView(R.layout.dialog_audio);
                     progresschatDialog.setCancelable(true);
@@ -586,6 +587,7 @@ public class GroupChatFragment extends Fragment {
                     btStartRecording = progresschatDialog.findViewById(R.id.btStartAudio);
                     btPlayRecording = progresschatDialog.findViewById(R.id.btPlayAudio);
                     btStopRecording = progresschatDialog.findViewById(R.id.btStopAudio);
+                    ivRecording = progresschatDialog.findViewById(R.id.ivRecording);
                     btPauseRecording = progresschatDialog.findViewById(R.id.btPauseAudio);
                     btSendAudioFile = progresschatDialog.findViewById(R.id.btSendAudioFile);
                     btStartRecording.setOnClickListener(new View.OnClickListener() {
@@ -606,6 +608,7 @@ public class GroupChatFragment extends Fragment {
                             btStopRecording.setVisibility(View.GONE);
                             btPauseRecording.setVisibility(View.GONE);
                             btPlayRecording.setVisibility(View.GONE);
+                            ivRecording.setVisibility(View.GONE);
                             btSendAudioFile.setVisibility(View.VISIBLE);
                             pauseRecording();
                         }
@@ -620,6 +623,7 @@ public class GroupChatFragment extends Fragment {
                             btStopRecording.setVisibility(View.GONE);
                             btPauseRecording.setVisibility(View.VISIBLE);
                             btSendAudioFile.setVisibility(View.GONE);
+                            ivRecording.setVisibility(View.GONE);
                             btPlayRecording.setVisibility(View.VISIBLE);
                             sendAudioFileWithThumbnail(Uri.fromFile(new File(mFileName)));
                         }
@@ -631,6 +635,7 @@ public class GroupChatFragment extends Fragment {
                         public void onClick(View v) {
 
                             btStopRecording.setVisibility(View.GONE);
+                            ivRecording.setVisibility(View.GONE);
                             btPauseRecording.setVisibility(View.VISIBLE);
                             btStartRecording.setVisibility(View.GONE);
                             playAudio();
@@ -643,7 +648,7 @@ public class GroupChatFragment extends Fragment {
                         public void onClick(View v) {
 
                             btStopRecording.setVisibility(View.GONE);
-                            btPauseRecording.setVisibility(View.GONE);
+                            btPauseRecording.setVisibility(View.VISIBLE);
                             btPlayRecording.setVisibility(View.VISIBLE);
                             btSendAudioFile.setVisibility(View.GONE);
                             pausePlaying();
@@ -696,22 +701,17 @@ public class GroupChatFragment extends Fragment {
     }
 
     private String getFilename() {
-
-
-
-
-        String filepath = Environment.getExternalStorageDirectory().getPath();
-        File file = new File(filepath, "SuvichRecording");
+        File file;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            file = new File(String.valueOf(getContext().getExternalFilesDir(null)));
+        } else {
+            file = new File(Environment.getExternalStorageDirectory().getAbsolutePath(), "SuvichRecording");
+        }
 
         if (!file.exists()) {
             file.mkdirs();
         }
 
-        if (! file.exists()){
-            if (! file.mkdirs()){
-                Toast.makeText(getContext(), "Fail to Create Directory ", Toast.LENGTH_SHORT).show();
-            }
-        }
 
         fileName = System.currentTimeMillis() + ".mp3";
         try {
@@ -1009,9 +1009,24 @@ public class GroupChatFragment extends Fragment {
                         }
                     })
                     .show();
+        } else if (ActivityCompat.shouldShowRequestPermissionRationale(getActivity(),
+                RECORD_AUDIO)) {
+            // Provide an additional rationale to the user if the permission was not granted
+            // and the user would benefit from additional context for the use of the permission.
+            // For example if the user has previously denied the permission.
+            Snackbar.make(mRootLayout, "Storage access permissions are required to upload/download files.",
+                    Snackbar.LENGTH_LONG)
+                    .setAction("Okay", new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            requestPermissions(new String[]{RECORD_AUDIO},
+                                    REQUEST_AUDIO_PERMISSION_CODE);
+                        }
+                    })
+                    .show();
         } else {
             // Permission has not been granted yet. Request it directly.
-            requestPermissions(new String[]{WRITE_EXTERNAL_STORAGE},
+            requestPermissions(new String[]{WRITE_EXTERNAL_STORAGE, RECORD_AUDIO},
                     PERMISSION_WRITE_EXTERNAL_STORAGE);
         }
     }
@@ -1278,13 +1293,18 @@ public class GroupChatFragment extends Fragment {
 
 
         // this code recoqure minima 21 api levels
-        Path path = file.toPath();
-        String mime="";
+        Path path = null;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            path = file.toPath();
+        }
+        String mime = "";
         // using java 7 probeContentType
         try {
 
             // this code recoqure minima 21 api levels
-            mime = Files.probeContentType(path);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                mime = Files.probeContentType(path);
+            }
         } catch (IOException e) {
             e.printStackTrace();
         }

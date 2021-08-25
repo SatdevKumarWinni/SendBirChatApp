@@ -9,7 +9,6 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.sendbird.android.AdminMessage;
@@ -22,13 +21,6 @@ import com.sendbird.android.SendBirdException;
 import com.sendbird.android.User;
 import com.sendbird.android.UserMessage;
 
-import infosys.satdev.sendbirchatapp.utils.DateUtils;
-import infosys.satdev.sendbirchatapp.utils.FileUtils;
-import infosys.satdev.sendbirchatapp.utils.ImageUtils;
-import infosys.satdev.sendbirchatapp.utils.TextUtils;
-import infosys.satdev.sendbirchatapp.MessageStatusView;
-import infosys.satdev.sendbirchatapp.utils.UrlPreviewInfo;
-
 import org.json.JSONException;
 
 import java.io.File;
@@ -39,6 +31,11 @@ import java.util.List;
 
 import infosys.satdev.sendbirchatapp.MessageStatusView;
 import infosys.satdev.sendbirchatapp.R;
+import infosys.satdev.sendbirchatapp.utils.DateUtils;
+import infosys.satdev.sendbirchatapp.utils.FileUtils;
+import infosys.satdev.sendbirchatapp.utils.ImageUtils;
+import infosys.satdev.sendbirchatapp.utils.TextUtils;
+import infosys.satdev.sendbirchatapp.utils.UrlPreviewInfo;
 
 
 class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
@@ -58,12 +55,12 @@ class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
     private Context mContext;
     private GroupChannel mChannel;
-    private List<BaseMessage> mMessageList;
+    private final List<BaseMessage> mMessageList;
 
     private OnItemClickListener mItemClickListener;
     private OnItemLongClickListener mItemLongClickListener;
 
-    private Hashtable<String, Uri> mTempFileMessageUriTable = new Hashtable<>();
+    private final Hashtable<String, Uri> mTempFileMessageUriTable = new Hashtable<>();
     private boolean mIsMessageListLoading;
 
     interface OnItemLongClickListener {
@@ -620,7 +617,8 @@ class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
 
     private class AdminMessageHolder extends RecyclerView.ViewHolder {
-        private TextView messageText, dateText;
+        private final TextView messageText;
+        private final TextView dateText;
 
         AdminMessageHolder(View itemView) {
             super(itemView);
@@ -922,12 +920,14 @@ class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
             tvFileName = (TextView) itemView.findViewById(R.id.tvFileName);
             ivPlayAudio = (ImageView) itemView.findViewById(R.id.ivPlayAudio);
             dateText = (TextView) itemView.findViewById(R.id.text_group_chat_date);
+            timeText = (TextView) itemView.findViewById(R.id.text_group_chat_time);
 
 //            fileSizeText = (TextView) itemView.findViewById(R.id.text_group_chat_file_size);
 
         }
 
         void bind(Context context, final FileMessage message, GroupChannel channel, boolean isNewDay, boolean isContinuous, final OnItemClickListener listener) {
+            timeText.setText(DateUtils.formatTime(message.getCreatedAt()));
 
             tvFileName.setText(String.valueOf(message.getName()));
             // Show the date if the message was sent on a different date than the previous message.
@@ -961,12 +961,14 @@ class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
             tvFileName = (TextView) itemView.findViewById(R.id.tvFileName);
             ivPlayAudio = (ImageView) itemView.findViewById(R.id.ivPlayAudio);
+            timeText = (TextView) itemView.findViewById(R.id.text_group_chat_time);
+
             dateText = (TextView) itemView.findViewById(R.id.text_group_chat_date);
         }
 
         void bind(Context context, final FileMessage message, GroupChannel channel, boolean isNewDay, boolean isContinuous, final OnItemClickListener listener) {
             tvFileName.setText(message.getName());
-//            timeText.setText(DateUtils.formatTime(message.getCreatedAt()));
+            timeText.setText(DateUtils.formatTime(message.getCreatedAt()));
 //            fileSizeText.setText(String.valueOf(message.getSize()));
 
             // Show the date if the message was sent on a different date than the previous message.
@@ -983,12 +985,8 @@ class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 itemView.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        if (isPlay[0]){
-                            isPlay[0] =false;
-                        }else {
-                            isPlay[0] =true;
-                        }
-                        listener.onAudioMessageItemClick(message,ivPlayAudio);
+                        isPlay[0] = !isPlay[0];
+                        listener.onAudioMessageItemClick(message, ivPlayAudio);
                     }
                 });
             }
