@@ -78,6 +78,7 @@ class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
         void onUserMessageItemClick(UserMessage message);
 
         void onFileMessageItemClick(FileMessage message);
+        void onAudioMessageItemClick(FileMessage message ,ImageView iconView);
     }
 
 
@@ -943,16 +944,7 @@ class GroupChatAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
                 ivPlayAudio.setOnClickListener(new View.OnClickListener() {
                     @Override
                     public void onClick(View v) {
-                        if (isPlay[0]){
-                            isPlay[0] =false;
-                            ivPlayAudio.setBackgroundDrawable(ContextCompat.getDrawable(context, R.drawable.ic_play) );
-                        }else {
-                            ivPlayAudio.setBackgroundDrawable(ContextCompat.getDrawable(context, R.drawable.ic_baseline_pause_circle_filled_24) );
-isPlay[0] =true;
-                        }
-
-                        listener.onFileMessageItemClick(message);
-
+                        listener.onAudioMessageItemClick(message,ivPlayAudio);
                     }
                 });
             }
@@ -993,12 +985,10 @@ isPlay[0] =true;
                     public void onClick(View v) {
                         if (isPlay[0]){
                             isPlay[0] =false;
-                            ivPlayAudio.setBackgroundDrawable(ContextCompat.getDrawable(context, R.drawable.ic_play) );
                         }else {
-                            ivPlayAudio.setBackgroundDrawable(ContextCompat.getDrawable(context, R.drawable.ic_baseline_pause_circle_filled_24) );
                             isPlay[0] =true;
                         }
-                        listener.onFileMessageItemClick(message);
+                        listener.onAudioMessageItemClick(message,ivPlayAudio);
                     }
                 });
             }

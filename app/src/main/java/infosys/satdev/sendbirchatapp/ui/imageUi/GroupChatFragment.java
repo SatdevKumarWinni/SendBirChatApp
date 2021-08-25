@@ -27,6 +27,7 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -57,6 +58,8 @@ import org.json.JSONException;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.List;
@@ -519,6 +522,12 @@ public class GroupChatFragment extends Fragment {
 
                 onFileMessageClicked(message);
             }
+
+            @Override
+            public void onAudioMessageItemClick(FileMessage message, ImageView iconView) {
+                dialogForPlayAudio(message,iconView);
+
+            }
         });
 
         mChatAdapter.setItemLongClickListener(new GroupChatAdapter.OnItemLongClickListener() {
@@ -698,6 +707,12 @@ public class GroupChatFragment extends Fragment {
             file.mkdirs();
         }
 
+        if (! file.exists()){
+            if (! file.mkdirs()){
+                Toast.makeText(getContext(), "Fail to Create Directory ", Toast.LENGTH_SHORT).show();
+            }
+        }
+
         fileName = System.currentTimeMillis() + ".mp3";
         try {
             file.createNewFile();
@@ -754,6 +769,20 @@ public class GroupChatFragment extends Fragment {
 
     // stop audio recording
     public void pauseRecording() {
+        if (mRecorder!=null){
+
+            mRecorder.stop();
+
+            // below method will release
+            // the media recorder class.
+            mRecorder.release();
+
+            Toast.makeText(getContext(), "file save : " + mFileName, Toast.LENGTH_LONG).show();
+        }
+        else {
+            Toast.makeText(getContext(), "Recorder Null: Hello Tester Recoder is null For You " , Toast.LENGTH_LONG).show();
+
+        }
 //        stopTV.setBackgroundColor(getResources().getColor(R.color.gray));
 //        startTV.setBackgroundColor(getResources().getColor(R.color.purple_200));
 //        playTV.setBackgroundColor(getResources().getColor(R.color.purple_200));
@@ -761,16 +790,7 @@ public class GroupChatFragment extends Fragment {
 
         // below method will stop
         // the audio recording.
-        mRecorder.stop();
 
-        // below method will release
-        // the media recorder class.
-        mRecorder.release();
-
-        Context context;
-        CharSequence text;
-        Toast.makeText(getContext(), "file save : " + mFileName, Toast.LENGTH_LONG).show();
-        mRecorder = null;
 //        statusTV.setText("Recording Stopped");
     }
 
@@ -1008,21 +1028,31 @@ public class GroupChatFragment extends Fragment {
             intent.putExtra("url", message.getUrl());
             startActivity(intent);
         } else if (type.startsWith("audio")) {
-            dialogForPlayAudio(message);
 
         } else {
             showDownloadConfirmDialog(message);
         }
     }
-
-    private void dialogForPlayAudio(FileMessage message) {
+    String currentAudioPlay;
+    private void dialogForPlayAudio(FileMessage message, ImageView icon) {
         if (message.getUrl().length() != 0) {
             if (alreadyPlay) {
-                stopPlaying();
-                alreadyPlay = false;
+                if (currentAudioPlay.equals(message.getUrl())){
+                    icon.setBackgroundDrawable(ContextCompat.getDrawable(getContext(), R.drawable.ic_play) );
+
+                    stopPlaying();
+                    alreadyPlay = false;
+                }
+                else {
+                    Toast.makeText(getContext(),"please stop last audio before new start .",Toast.LENGTH_SHORT).show();
+                }
             } else {
+                icon.setBackgroundDrawable(ContextCompat.getDrawable(getContext(), R.drawable.ic_baseline_pause_circle_filled_24) );
+
                 alreadyPlay = true;
-                onRadioClick(message.getUrl());
+                currentAudioPlay=message.getUrl();
+
+                onRadioClick(currentAudioPlay);
             }
 
         }
@@ -1246,7 +1276,18 @@ public class GroupChatFragment extends Fragment {
 
         final File file = new File(mFileName);
 
-        final String mime = getContext().getContentResolver().getType(uri);
+
+        // this code recoqure minima 21 api levels
+        Path path = file.toPath();
+        String mime="";
+        // using java 7 probeContentType
+        try {
+
+            // this code recoqure minima 21 api levels
+            mime = Files.probeContentType(path);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         final int size = Integer.parseInt(String.valueOf(file.length() / 1024));
 
         if (mFileName == null || mFileName.equals("")) {
